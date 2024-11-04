@@ -4,31 +4,56 @@
 FILE_PATH=$1
 BUCKET_PATH=$2
 
+message(){
+  echo -e "****Cloud Uploader Instructions*****"
+  echo -e
+  echo -e "usage clouduploader \e[34m/path/to/file\e[0m [bucket-path]"
+}
+
+
+
 # Validate that file path is provided
 if [ -z "$FILE_PATH" ]; then
-  echo "Error: No file path provided."
-  echo "Usage: clouduploader /path/to/file [bucket-path]"
+  message
   exit 1
 fi
 
-# Check if file exists
-if [ ! -f "$FILE_PATH" ]; then
-  echo "Error: File does not exist."
-  exit 1
-fi
 
-# Upload file to cloud storage
-echo "Uploading $FILE_PATH to $BUCKET_PATH ..."
-aws s3 cp "/$FILE_PATH" $BUCKET_PATH --acl public-read
 
-# Check if the upload was successful
-if [ $? -eq 0 ]; then
-  echo "✅ Success: File '$FILE_PATH' has been uploaded to '$BUCKET_PATH'."
+if [ -f "$FILE_PATH" ]; then
+#for a single file upload
+  FILES_TO_UPLOAD=("$FILE_PATH")
+elif [ -d "$FILE_PATH" ]; then
+#for directory upload
+  FILES_TO_UPLOAD=($(find "$FILE_PATH" -type f))
 else
-  echo "❌ Error: Failed to upload '$FILE_PATH' to S3."
+  echo -e "\e[31mError file or directory doesn't exist\e[0m"
   exit 1
 fi
+
+
+# Upload file or directory to cloud storage
+echo "Uploading $FILE_PATH to $BUCKET_PATH ..."
+
+for file in "${FILES_TO_UPLOAD[@]}";do
+  if [ -f "$file" ];then
+    echo "Uploading $file to $BUCKET_PATH...."
+    aws s3 cp "/$file" $BUCKET_PATH --acl public-read
+
+# check if upload was successful
+    if [ $? -eq 0 ];then
+      echo "✅ Success: File '$file' has been uploaded to '$BUCKET_PATH'."
+    else
+      echo "❌ Error: Failed to upload '$file' to S3."
+        exit 1
+    fi
+  fi
+done
+
+
 
 # Generate and display the URL
-S3_URL="https://s3.amazonaws.com/$BUCKET_PATH/$FILE_PATH"
-echo "🌐 Access your file at: $S3_URL"
+for file in "${FILES_TO_UPLOAD[@]}"; do
+  S3_URL="https://s3.amazonaws.com/$BUCKET_PATH/$(basename "$file")"
+  echo "🌐 Access your file at: $S3_URL"
+done
